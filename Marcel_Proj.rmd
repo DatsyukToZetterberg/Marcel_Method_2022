@@ -1,12 +1,6 @@
----
-title: "Untitled"
-author: "Alex Walker"
-date: '2022-06-12'
-output: html_document
----
-
 library(tidyverse) 
 library(rvest)
+
 
 # these are all the funtions you will need to use 
 
@@ -146,7 +140,7 @@ lg_avg_season
 
 # select which season you wish to project
 
-proj_season <- 2017
+proj_season <- 2022
 
 # you will need 3 seasons worth of data. 
 
@@ -187,13 +181,13 @@ n1_season$season <- "n1"
 n2_season$season <- "n2"
 n3_season$season <- "n3"
 
-# Also add the weights we will be using
+# Add the weights we will be using for the weighted average
 
-n1_season$weight <- 5
+n1_season$weight <- 6
 n2_season$weight <- 3
 n3_season$weight <- 1
 
-# Create playerID for duplicate names. Eg: There are 2 Sebastian Aho's in 2023 projection
+# Create playerID for duplicate names. Eg: There are 2 Sebastian Aho's in the 2023 projection
 
 n1_season$PlayerID <- paste(gsub(" ", "", n1_season$Player),n1_season$Age+1, sep ="")
 
@@ -225,10 +219,10 @@ n1_joined <- merge(season_n1,n1_average, by = c("season", "pos"))
 n2_joined <- merge(season_n2,n2_average, by = c("season", "pos"))
 n3_joined <- merge(season_n3,n3_average, by = c("season", "pos"))
 
-# create the weighted values for each season
+# create the weighted values for each season. Do this using mutate_at
 
 weight_n1 <- n1_joined %>% mutate_at(vars(c(
-                      "gp","tot.toi", "g", "a", "p", "ppg",
+                      "tot.toi", "g", "a", "p", "ppg",
                       "ppa","shg","sha", "sog", "blk", "hit",
                       "pim", "fow","fol","lg_avg_toi","lg_avg_pts",
                       "lg_avg_g", "lg_avg_a","lg_avg_ppg",
@@ -238,7 +232,7 @@ weight_n1 <- n1_joined %>% mutate_at(vars(c(
                       )), ~.*weight)
                       
 weight_n2 <- n2_joined %>% mutate_at(vars(c(
-                      "gp","tot.toi", "g", "a", "p", "ppg",
+                      "tot.toi", "g", "a", "p", "ppg",
                       "ppa","shg","sha", "sog", "blk", "hit",
                       "pim", "fow","fol","lg_avg_toi","lg_avg_pts",
                       "lg_avg_g", "lg_avg_a","lg_avg_ppg",
@@ -248,7 +242,7 @@ weight_n2 <- n2_joined %>% mutate_at(vars(c(
                       )), ~.*weight)     
                       
 weight_n3 <- n3_joined %>% mutate_at(vars(c(
-                      "gp","tot.toi", "g", "a", "p", "ppg",
+                      "tot.toi", "g", "a", "p", "ppg",
                       "ppa","shg","sha", "sog", "blk", "hit",
                       "pim", "fow","fol","lg_avg_toi","lg_avg_pts",
                       "lg_avg_g", "lg_avg_a","lg_avg_ppg",
@@ -257,27 +251,27 @@ weight_n3 <- n3_joined %>% mutate_at(vars(c(
                       "lg_avg_pim","lg_avg_fow","lg_avg_fol"
                       )), ~.*weight)                      
 
-# combine the seasons use playerID as the join
+# combine the seasons using playerID as the join. We will also filter out anyone that played less than 9 games in either season. We will also create the proj_toi stat
 
 joined_seasons <- merge(merge(weight_n1,
                   weight_n2,by ="playerID", all = TRUE),weight_n3, 
                   by = "playerID", all = TRUE) %>% 
       # filter out anyone that hasn't played in n1 or n2
-                  filter(gp.x > 5 | gp.y > 5) %>%
+                  filter(gp.x > 9 | gp.y > 9) %>%
       # create proj_toi based on which season a player played in
                   mutate(proj_toi = case_when(
         (pos.x == "F" & season.y == "n2" & season.x == "n1") ~ 
-        0.20 * toi.gp.y+0.50 * toi.gp.x + (5),
+        0.10 * toi.gp.y+0.80 * toi.gp.x + 1.5,
         (pos.x == "F" & is.na(season.y) & season.x == "n1") ~ 
-        0.7 * toi.gp.x + (4),
+        0.8 * toi.gp.x + (3.5),
         (pos.y == "F" & is.na(season.x) & season.y == "n2") ~ 
-        0.6 * toi.gp.y + (6),
+        0.7 * toi.gp.y + (5),
         (pos.x == "D" & season.y == "n2" & season.x == "n1") ~ 
-        0.20 * toi.gp.y+0.50 * toi.gp.x + (6),
+        0.20 * toi.gp.y+0.70 * toi.gp.x + 2,
         (pos.x == "D" & is.na(season.y) & season.x == "n1") ~ 
-        0.7 * toi.gp.x + (5),
+        0.8 * toi.gp.x + (4),
         (pos.y == "D" & is.na(season.x) & season.y == "n2") ~ 
-        0.65 * toi.gp.y + (6),
+        0.7 * toi.gp.y + (6),
         TRUE ~ 0.00)) %>%
                 #Update age to proj season age
                  mutate(new_age = case_when(
@@ -292,15 +286,106 @@ joined_seasons <- merge(merge(weight_n1,
                  # replace all NAs with 0s
                  mutate_all(~replace(., is.na(.), 0))
                  
-                        
-# Add all 3 of seasons together to create a single weighted value for each stat
+                 
+# Using case_when we can create GP projections based on specific coniditons. We also will add all 3 of seasons together to create a single weighted value for each stat (both the league average stats and player)
 
 sum_plyr <- joined_seasons %>%
                 transmute(
-                  playerID = playerID,
-                  player = ifelse(player.x == 0,player.y, player.x),
-                  age = new_age,
-                  pos = new_pos,
+                playerID = playerID,
+                player = ifelse(player.x == 0,player.y, player.x),
+                age = new_age,
+                pos = new_pos,
+                gp = case_when(
+            #1. GP proj for depth F, 2 seasons
+                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) &                          pos == "F" & proj_toi <= 13.5 ~
+                round(35*.6+.2*(gp.x/max(gp.x)*82)
+                +.2*(gp.y/max(gp.y)*82)),
+            #2. GP proj for depth D, 2 seasons
+                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) &                          pos == "D" & proj_toi <= 16.5 ~
+                round(35*.6+.2*(gp.x/max(gp.x)*82)
+                +.2*(gp.y/max(gp.y)*82)),
+            #3. GP proj for non depth F, 2 seasons
+                gp.x > 0.5*max(gp.x) & gp.y > 0.5*max(gp.y) & pos == "F"~
+                round(76*.5+.25*(gp.x/max(gp.x))*82
+                +.25*(gp.y/max(gp.y))*82),
+            #4. GP proj for non depth D, 2 seasons
+                gp.x > 0.5*max(gp.x) & gp.y > 0.5*max(gp.y) & pos == "D"~
+                round(76*.5+.25*(gp.x/max(gp.x))*82
+                +.25*(gp.y/max(gp.y))*82),
+            #5.  GP proj for non depth F, n1 szn < 41, n2 szn > 41
+                gp.x <= 0.5*max(gp.x) & gp.y > 0.5*max(gp.y) & pos == "F" 
+                & proj_toi > 13.50 ~
+                round(74*.7+.125*(gp.x/max(gp.x))*82
+                +.175*(gp.y/max(gp.y))*82),
+            #6. GP proj for non depth D, n1 szn < 41, n2 szn > 41
+                gp.x <= 0.5*max(gp.x) & gp.y > 0.5*max(gp.y) & pos == "D"
+                & proj_toi > 16.50 ~
+                round(74*.7+.125*(gp.x/max(gp.x))*82
+                +.175*(gp.y/max(gp.y))*82),
+            #7. GP proj for non depth F, n1 szn > 41, n2 szn < 41
+                gp.x > 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) & pos == "F"
+                & proj_toi > 13.5 ~
+                round(74*.7+.175*(gp.x/max(gp.x))*82
+                +.125*(gp.y/max(gp.y))*82),
+            #8. GP proj for non depth D, n1 szn > 41, n2 szn < 41
+                gp.x > 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) & pos == "D"
+                & proj_toi > 16.5~
+                round(74*.7+.175*(gp.x/max(gp.x))*82
+                +.125*(gp.y/max(gp.y))*82),
+            #9. GP proj for non depth F, n1 szn < 41, n2 szn > 41
+                gp.x <= 0.5*max(gp.x) & gp.y > 0.5*max(gp.y) & pos =="F"                 & proj_toi > 13.5 ~
+                round(74*.7+.125*(gp.x/max(gp.x))*82
+                +.175*(gp.y/max(gp.y))*82),
+            #10.GP proj for non depth D, n1 szn < 41, n2 szn > 41
+                gp.x <= 0.5*max(gp.x) & gp.y > 0.5*max(gp.y) & pos =="D"
+                & proj_toi > 16.5 ~
+                round(74*.7+.125*(gp.x/max(gp.x))*82
+                +.175*(gp.y/max(gp.y))*82),
+            #11.GP proj for non depth F, 2 seasons
+                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) &                          pos == "F" & proj_toi > 13.5 ~
+                round(74*.8+.10*(gp.x/max(gp.x)*82)
+                +.10*(gp.y/max(gp.y)*82)),
+            #12.GP proj for non depth D, 2 seasons
+                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) &                          pos == "D" & proj_toi > 16.5 ~
+                round(74*.8+.10*(gp.x/max(gp.x)*82)
+                +.10*(gp.y/max(gp.y)*82)),
+            #13.GP proj for depth F, n1 szn < 41, n2 szn > 41
+                gp.x <= 0.5*max(gp.x) & gp.y > 0.5*max(gp.y) & pos == "F" 
+                & proj_toi <= 13.50 ~
+                round(50*.7+.125*(gp.x/max(gp.x))*82
+                +.175*(gp.y/max(gp.y))*82),
+            #14.GP proj for depth D, n1 szn < 41, n2 szn > 41
+                gp.x <= 0.5*max(gp.x) & gp.y > 0.5*max(gp.y) & pos == "D"
+                & proj_toi <= 16.50 ~
+                round(50*.7+.125*(gp.x/max(gp.x))*82
+                +.175*(gp.y/max(gp.y))*82),
+            #15.GP proj for depth F, n1 szn > 41, n2 szn < 41
+                gp.x > 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) & pos == "F"
+                & proj_toi <= 13.5 ~
+                round(50*.7+.175*(gp.x/max(gp.x))*82
+                +.125*(gp.y/max(gp.y))*82),
+            #16.GP proj depth D, n1 szn > 41, n2 szn < 41
+                gp.x > 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) & pos == "D"
+                & proj_toi <= 16.5~
+                round(50*.7+.175*(gp.x/max(gp.x))*82
+                +.125*(gp.y/max(gp.y))*82),
+            #17.GP proj for depth F, n1 szn < 41, n2 szn > 41
+                gp.x <= 0.5*max(gp.x) & gp.y > 0.5*max(gp.y) & pos =="F"                 & proj_toi <= 13.5 ~
+                round(50*.7+.125*(gp.x/max(gp.x))*82
+                +.175*(gp.y/max(gp.y))*82),
+            #18.GP proj for depth D, n1 szn < 41, n2 szn > 41
+                gp.x <= 0.5*max(gp.x) & gp.y > 0.5*max(gp.y) & pos =="D"
+                & proj_toi <= 16.5 ~
+                round(50*.7+.125*(gp.x/max(gp.x))*82
+                +.175*(gp.y/max(gp.y))*82),
+            #19.GP proj for depth F, 2 seasons < 41
+                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) &                          pos == "F" & proj_toi <= 13.5 ~
+                round(50*.8+.10*(gp.x/max(gp.x)*82)
+                +.10*(gp.y/max(gp.y)*82)),
+            #20.GP proj for depth D, 2 seasons
+                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) &                          pos == "D" & proj_toi <= 16.5 ~
+                round(50*.8+.10*(gp.x/max(gp.x)*82)
+                +.10*(gp.y/max(gp.y)*82))),
                   proj_toi = round(proj_toi,2),
                   sum_g = g.x+g.y+g,
                   sum_a = a.x+a.y+a,
@@ -343,7 +428,8 @@ sum_plyr <- joined_seasons %>%
                   lg_avg_fow,
                   sum_lg_avg_fol = lg_avg_fol.x+lg_avg_fol.y+
                   lg_avg_fol)
-           
+                  
+
 #f & d are the amounts of toi that will regress the players production towards their positions league average. 
 #Eg: A F with w_toi of 12500 will have their stat's regressed 6% towards league average while a F with 3000 will be regressed 25%
                   
@@ -351,44 +437,47 @@ f = 750
 d = 1000 
 
 # to calc the non-age adjusted projections we have the following formula. If we were projecting goals it would be:
-# (regressed goals + weighted goals)/(regressed toi + weighted toi)
-# This number is then multipled by GP and proj toi
-# Matthews goals would be: ((113/7724)*750+470)/(12357+750)*82*19.62
+# [(regressed g + weighted g)/(regressed toi + weighted toi)]*GP*toi
+# regressed goals is how many goals a lg average player would've scored in that players TOI
+# This number is then multipled by GP and toi
+# Eg: Matthews 2023 goals would be: ((128/8690)*750+530)/(13862+750)*75*20.15
 
 proj_plyr <- sum_plyr %>% transmute(
                 player = player,
                 age = age,
                 pos= pos,
+                gp = round(gp,0),
                 proj_toi = proj_toi,
-                proj_g =  round((((sum_lg_avg_g/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_g)/(ifelse(pos == "F",f,d)+sum_wtoi)*82*proj_toi,2),
-                proj_a =  round((((sum_lg_avg_a/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_a)/(ifelse(pos == "F",f,d)+sum_wtoi)*82*proj_toi,2),
-                proj_p =  round((((sum_lg_avg_pts/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_p)/(ifelse(pos == "F",f,d)+sum_wtoi)*82*proj_toi,2),
-                proj_ppa =  round((((sum_lg_avg_ppa/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_ppa)/(ifelse(pos == "F",f,d)+sum_wtoi)*82*proj_toi,2),
-                proj_ppg =  round((((sum_lg_avg_ppg/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_ppg)/(ifelse(pos == "F",f,d)+sum_wtoi)*82*proj_toi,2),
+                proj_g =  round((((sum_lg_avg_g/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_g)/(ifelse(pos == "F",f,d)+sum_wtoi)*gp*proj_toi,2),
+                proj_a =  round((((sum_lg_avg_a/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_a)/(ifelse(pos == "F",f,d)+sum_wtoi)*gp*proj_toi,2),
+                proj_p =  round((((sum_lg_avg_pts/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_p)/(ifelse(pos == "F",f,d)+sum_wtoi)*gp*proj_toi,2),
+                proj_ppa =  round((((sum_lg_avg_ppa/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_ppa)/(ifelse(pos == "F",f,d)+sum_wtoi)*gp*proj_toi,2),
+                proj_ppg =  round((((sum_lg_avg_ppg/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_ppg)/(ifelse(pos == "F",f,d)+sum_wtoi)*gp*proj_toi,2),
                 proj_ppp = proj_ppg+proj_ppa,
-                proj_sha =  round((((sum_lg_avg_sha/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_sha)/(ifelse(pos == "F",f,d)+sum_wtoi)*82*proj_toi,2),
-                proj_shg =  round((((sum_lg_avg_shg/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_shg)/(ifelse(pos == "F",f,d)+sum_wtoi)*82*proj_toi,2),
+                proj_sha =  round((((sum_lg_avg_sha/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_sha)/(ifelse(pos == "F",f,d)+sum_wtoi)*gp*proj_toi,2),
+                proj_shg =  round((((sum_lg_avg_shg/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_shg)/(ifelse(pos == "F",f,d)+sum_wtoi)*gp*proj_toi,2),
                 proj_shp = proj_shg+proj_sha,
-                proj_sog =  round((((sum_lg_avg_sog/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_sog)/(ifelse(pos == "F",f,d)+sum_wtoi)*82*proj_toi,2),
-                proj_hit =  round((((sum_lg_avg_hit/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_hit)/(ifelse(pos == "F",f,d)+sum_wtoi)*82*proj_toi,2),
-                proj_blk =  round((((sum_lg_avg_blk/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_blk)/(ifelse(pos == "F",f,d)+sum_wtoi)*82*proj_toi,2),
-                proj_fow =  round((((sum_lg_avg_fow/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_fow)/(ifelse(pos == "F",f,d)+sum_wtoi)*82*proj_toi,2),
-                proj_fol =  round((((sum_lg_avg_fol/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_fol)/(ifelse(pos == "F",f,d)+sum_wtoi)*82*proj_toi,2)
+                proj_sog =  round((((sum_lg_avg_sog/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_sog)/(ifelse(pos == "F",f,d)+sum_wtoi)*gp*proj_toi,2),
+                proj_hit =  round((((sum_lg_avg_hit/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_hit)/(ifelse(pos == "F",f,d)+sum_wtoi)*gp*proj_toi,2),
+                proj_blk =  round((((sum_lg_avg_blk/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_blk)/(ifelse(pos == "F",f,d)+sum_wtoi)*gp*proj_toi,2),
+                proj_pim =  round((((sum_lg_avg_pim/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_pim)/(ifelse(pos == "F",f,d)+sum_wtoi)*gp*proj_toi,2),
+                proj_fow =  round((((sum_lg_avg_fow/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_fow)/(ifelse(pos == "F",f,d)+sum_wtoi)*gp*proj_toi,2),
+                proj_fol =  round((((sum_lg_avg_fol/sum_lg_avg_toi)*ifelse(pos == "F",f,d))+sum_fol)/(ifelse(pos == "F",f,d)+sum_wtoi)*gp*proj_toi,2)
                 )
                 
 # now we adjust the projections based on players age. Assumptions are that a player's aging is constant improvement/regression        
                 
 proj_stat_age <- proj_plyr %>% mutate_at(
                 vars(starts_with("proj")), ~.*(ifelse(age <= 28, 
-                (28 - age)*0.0075, (28-age)*0.005)+1))
+                (28 - age)*0.005, (28-age)*0.005)+1))
                 
-# this will produce a final cleaned up df of the projections                
+# this will produce a final cleaned up version of the projections                
 
 final_proj <- proj_stat_age %>% transmute(
                 player = player,
                 age = age,
                 pos= pos,
-                gp = 82, 
+                gp = gp,
                 toi = round(proj_toi,2),
                 g =  round(proj_g,0),
                 a =  round(proj_a,0),
@@ -402,6 +491,7 @@ final_proj <- proj_stat_age %>% transmute(
                 sog =  round(proj_sog,0),
                 hit =  round(proj_hit,0),
                 blk =  round(proj_blk,0),
+                pim =  round(proj_pim,0),
                 fow =  round(ifelse(pos == "F", proj_fow,0),0),
                 fol = round(ifelse(pos == "F", proj_fol,0),0)
                 ) %>% 
