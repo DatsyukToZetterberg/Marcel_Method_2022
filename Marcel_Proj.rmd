@@ -146,7 +146,7 @@ proj_season <- 2022
 
 n1 <- proj_season - 1
 n2 <- proj_season - 2
-n3 <- proj_season -3
+n3 <- proj_season - 3
 
 # This will act as our LCV
 
@@ -297,11 +297,11 @@ sum_plyr <- joined_seasons %>%
                 pos = new_pos,
                 gp = case_when(
             #1. GP proj for depth F, 2 seasons
-                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) &                          pos == "F" & proj_toi <= 13.5 ~
+                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) & pos == "F" & proj_toi <= 13.5 ~
                 round(35*.6+.2*(gp.x/max(gp.x)*82)
                 +.2*(gp.y/max(gp.y)*82)),
             #2. GP proj for depth D, 2 seasons
-                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) &                          pos == "D" & proj_toi <= 16.5 ~
+                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) & pos == "D" & proj_toi <= 16.5 ~
                 round(35*.6+.2*(gp.x/max(gp.x)*82)
                 +.2*(gp.y/max(gp.y)*82)),
             #3. GP proj for non depth F, 2 seasons
@@ -333,7 +333,7 @@ sum_plyr <- joined_seasons %>%
                 round(74*.7+.175*(gp.x/max(gp.x))*82
                 +.125*(gp.y/max(gp.y))*82),
             #9. GP proj for non depth F, n1 szn < 41, n2 szn > 41
-                gp.x <= 0.5*max(gp.x) & gp.y > 0.5*max(gp.y) & pos =="F"                 & proj_toi > 13.5 ~
+                gp.x <= 0.5*max(gp.x) & gp.y > 0.5*max(gp.y) & pos =="F" & proj_toi > 13.5 ~
                 round(74*.7+.125*(gp.x/max(gp.x))*82
                 +.175*(gp.y/max(gp.y))*82),
             #10.GP proj for non depth D, n1 szn < 41, n2 szn > 41
@@ -342,11 +342,11 @@ sum_plyr <- joined_seasons %>%
                 round(74*.7+.125*(gp.x/max(gp.x))*82
                 +.175*(gp.y/max(gp.y))*82),
             #11.GP proj for non depth F, 2 seasons
-                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) &                          pos == "F" & proj_toi > 13.5 ~
+                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) & pos == "F" & proj_toi > 13.5 ~
                 round(74*.8+.10*(gp.x/max(gp.x)*82)
                 +.10*(gp.y/max(gp.y)*82)),
             #12.GP proj for non depth D, 2 seasons
-                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) &                          pos == "D" & proj_toi > 16.5 ~
+                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) & pos == "D" & proj_toi > 16.5 ~
                 round(74*.8+.10*(gp.x/max(gp.x)*82)
                 +.10*(gp.y/max(gp.y)*82)),
             #13.GP proj for depth F, n1 szn < 41, n2 szn > 41
@@ -370,7 +370,7 @@ sum_plyr <- joined_seasons %>%
                 round(50*.7+.175*(gp.x/max(gp.x))*82
                 +.125*(gp.y/max(gp.y))*82),
             #17.GP proj for depth F, n1 szn < 41, n2 szn > 41
-                gp.x <= 0.5*max(gp.x) & gp.y > 0.5*max(gp.y) & pos =="F"                 & proj_toi <= 13.5 ~
+                gp.x <= 0.5*max(gp.x) & gp.y > 0.5*max(gp.y) & pos =="F" & proj_toi <= 13.5 ~
                 round(50*.7+.125*(gp.x/max(gp.x))*82
                 +.175*(gp.y/max(gp.y))*82),
             #18.GP proj for depth D, n1 szn < 41, n2 szn > 41
@@ -379,11 +379,11 @@ sum_plyr <- joined_seasons %>%
                 round(50*.7+.125*(gp.x/max(gp.x))*82
                 +.175*(gp.y/max(gp.y))*82),
             #19.GP proj for depth F, 2 seasons < 41
-                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) &                          pos == "F" & proj_toi <= 13.5 ~
+                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) & pos == "F" & proj_toi <= 13.5 ~
                 round(50*.8+.10*(gp.x/max(gp.x)*82)
                 +.10*(gp.y/max(gp.y)*82)),
             #20.GP proj for depth D, 2 seasons
-                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) &                          pos == "D" & proj_toi <= 16.5 ~
+                gp.x <= 0.5*max(gp.x) & gp.y <= 0.5*max(gp.y) & pos == "D" & proj_toi <= 16.5 ~
                 round(50*.8+.10*(gp.x/max(gp.x)*82)
                 +.10*(gp.y/max(gp.y)*82))),
                   proj_toi = round(proj_toi,2),
