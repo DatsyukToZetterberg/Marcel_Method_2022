@@ -1,10 +1,15 @@
 # Marcel_Method_2022
+
 An updated version of my marcel method for NHL projections. This version can now produce Marcels for any season dating back to 2011, it cannot go back further because
-previous seasons do not include FOW/FOL/Hit/Blk counts.
+previous seasons do not include FOW/FOL/Hit/Blk counts. If one wanted to go back further you could remove those categories and the code should still work.
 
 This version has incorporated the techniques I have learned since the previous version was created. This version uses hockeyreference to get all of the data
 required for the projections. The biggest changes come in the form of a revamped method for projecting TOI, a different weighting method - a 6-3-1 method was used, and a GP projection method was created.
 
-This new method allows for the GP projection of most players to be created. Tangotiger has discussed projecting GP, see this twitter post https://twitter.com/tangotiger/status/1511712124174798854, I'm not certain that I agree with the idea that a cap of 74 GPs is appropriate. The approach taken for the GP calculation was to separate players into either "depth" or "non depth" roles based on their projected toi stat, 13.50 minutes per game for F and 16.50 for D. These players would then have their projected GP stats regressed towards either 35, 50, 74, or 76 based on their previous 2 seasons of GP data. These numbers were chosen arbitrarily so there may be a more efficient set; however, I feel as though they do create an accurate representation of a player's most likely GP. The one issue that comes from this method is the abrupt end to each set of players. Ideally there would be a smooth transition from 1 set of players to the next, but 3 distinct distributions arrive from this method. 
+This new method allows for the GP projection of most players to be created. Tangotiger has discussed projecting GP, see this [blog post](http://tangotiger.net/NHL_forecast.html). I'm not certain that I agree with the idea that a cap of 76 GP is appropriate. Thus my method for projecting GP diverges from what Tango discussed in the post.
 
-Even accounting for some of the issues, I believe this approach for projecting GP to be very effective for players that will be fantasy relevant. This method allows for there to be context added to a player's GP numbers. We can separate those who may have fluky injuries, such as Kucherov or Eichel, from those that were healthy scratched frequently, like Givani Smith or Vinnie Hinostroza. It rewards players that have been able to stay healthy while reflecting the risk that those who have missed games are more likely to miss games in the future. 
+The approach taken for the GP calculation was to separate players into either "depth" or "non depth" roles based on their projected toi stat, 13.25 minutes per game for Forwards and 17.50 for Defenceman. These players would then have their projected GP stats regressed towards either 40, 74, or 76 based on their previous 2 seasons of GP data. These numbers were chosen arbitrarily so there may be a more efficient set; however, I feel as though they do create an accurate representation of a player's most likely GP. The one issue that comes from this method is the abrupt end to each set of players. Ideally there would be a smooth transition from 1 set of players to the next, but 2 distinct distributions arrive from this method of binning.
+
+
+
+
