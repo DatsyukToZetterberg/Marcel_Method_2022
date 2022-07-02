@@ -3,11 +3,17 @@
 library(tidyverse) 
 library(rvest)
 
-# these are all the funtions you will need to use to create the projections. 
 
-# function 1: Use this function to get the seasons required for the Marcel projections
 
 ```{r function}
+
+# This is our function used to create the projections
+
+proj_season <- function(year){
+
+## To begin we define 3 functions that will be used to get and transform the relevant data
+
+# function 1: Use this function to get the seasons required for the Marcel projections
 
 get_hockeyref <- function(url){
 
@@ -65,11 +71,8 @@ filtered_table <- num_table2 %>%
 filtered_table                  
 
 }
-```
 
 # function 2: use this function to get the information we want from the scrapped tables
-
-```{r function}
 
 get_info <- function(season){
 
@@ -102,11 +105,8 @@ info <- season %>% transmute(
 info
 
 }
-```
 
 # function 3: use this function to create league averages for each position
-
-``` {r function}
 
 season_average <- function(season){
 
@@ -135,25 +135,17 @@ lg_avg_season <- season %>%
                 )
          
 lg_avg_season
-}
-
-```
-
-# function 4. This uses the previous 3 functions to create the projections
-
-```{r function}
-
-proj_season <- function(year){
-
-season <- year
+}  
   
-# you will need 3 seasons worth of data. 
+## Now we begin with the actual projection process. 
 
-n1 <- season - 1
-n2 <- season - 2
-n3 <- season - 3
+# you will need 3 seasons worth of data. Gives us which 3 seasons of data are needed
 
-# This will act as our LCV
+n1 <- year - 1
+n2 <- year - 2
+n3 <- year - 3
+
+# seasons will act as our LCV in the for loop below
 
 seasons <- c(n1,n2,n3)
 
@@ -171,7 +163,7 @@ df_season[[j]] <- tryCatch(get_hockeyref(url),
                   error = function(e) NULL)
 print(j)
 j<-j+1
-Sys.sleep(0.5)
+Sys.sleep(3)
 }
 
 # turn each list into it's own season
@@ -200,7 +192,7 @@ n2_season$PlayerID <- paste(gsub(" ", "", n2_season$Player),n2_season$Age+2, sep
 
 n3_season$PlayerID <- paste(gsub(" ", "", n3_season$Player),n3_season$Age+3, sep ="")
 
-# create the transformed versions of each season. Filter out anyone that has < 9 GP
+# create the transformed versions of each season. Filter out anyone that has < 10 GP
 
 season_n1 <- get_info(n1_season) %>% filter(gp > 10)
 season_n2 <- get_info(n2_season) %>% filter(gp > 10)
@@ -256,13 +248,13 @@ weight_n3 <- n3_joined %>% mutate_at(vars(c(
                       "lg_avg_pim","lg_avg_fow","lg_avg_fol"
                       )), ~.*weight)                      
 
-# combine the seasons using playerID as the join. We will also filter out anyone that played less than 9 games in either season. We will also create the proj_toi stat
+# combine the seasons using playerID as the join. 
 
 joined_seasons <- merge(merge(weight_n1,
                   weight_n2,by ="playerID", all = TRUE),weight_n3, 
-                  by = "playerID", all = TRUE) %>% 
-      # filter out anyone that hasn't played in n1 or n2 seasons
-                  filter(gp.x > 9 | gp.y > 9) %>%
+                  by = "playerID", all = TRUE) %>%
+      # filter out anyone that last played in N-3 season
+                  filter(!is.na(gp.x) | !is.na(gp.y)) %>%
       # create proj_toi based on which season(s) a player played in
                   mutate(proj_toi = case_when(
         (pos.x == "F" & season.y == "n2" & season.x == "n1") ~ 
@@ -299,17 +291,17 @@ get_mode <- function(vector) {
    uniq_number[which.max(tabulate(match(vector, uniq_number)))]
 }
 
-# define the mode for each season
+# find the gp mode for each season, should be 82 GP in full length seasons
 
 n1_gp_mode <- get_mode(season_n1$gp)
 
 n2_gp_mode <- get_mode(season_n2$gp)
 
-# Using case_when create GP projections based on specific conditions, 22 cases in all. 
-# depth F is if toi <= 12, depth D is if toi <= 17.50
-# Also  add  3 of seasons together to create single weighted value for each stat
+# Use Case_when to create GP projections, assumes proj season will be full length 
+# depth F is if proj_toi <= 13.25, depth D is if proj_toi <= 17.50
 
 sum_plyr <- joined_seasons %>%
+            # select the relevant categories with transmute
                 transmute(
                 playerID = playerID,
                 player = ifelse(player.x == 0,player.y, player.x),
@@ -318,90 +310,95 @@ sum_plyr <- joined_seasons %>%
                 gp = case_when(
             #1. GP proj for depth F, 2 seasons
                 gp.x <= 0.4*n1_gp_mode & gp.y <= 0.4*n2_gp_mode & pos == "F"
-                & proj_toi <= 14 ~
-                round(40*.6+.2*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.2*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y)*82)),
+                & proj_toi <= 13.25 ~
+                round(40*.6+.2*if_else((gp.x/n1_gp_mode*82) >= 82, 82,gp.x/n1_gp_mode*82)
+                +.2*if_else((gp.y/n2_gp_mode*82) >= 82, 82,gp.y/n2_gp_mode*82)),
             #2. GP proj for depth D, 2 seasons
                 gp.x <= 0.4*n1_gp_mode & gp.y <= 0.4*n2_gp_mode & pos == "D" 
                 & proj_toi <= 17.5 ~
-                round(40*.6+.2*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.2*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y)*82)),
+                round(40*.6+.2*if_else((gp.x/n1_gp_mode*82) >= 82, 82,gp.x/n1_gp_mode*82)
+                +.2*if_else((gp.y/n2_gp_mode*82) >= 82, 82,gp.y/n2_gp_mode*82)),
             #3. GP proj for F, 2 seasons > 41
                 gp.x > 0.4*n1_gp_mode & gp.y > 0.4*n2_gp_mode & pos == "F"~
-                round(76*.5+.25*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.25*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y)*82)),
+                round(76*.5+.25*if_else((gp.x/n1_gp_mode*82) >= 82, 82,
+                gp.x/n1_gp_mode*82)
+                +.25*if_else((gp.y/n2_gp_mode*82) >= 82, 82,gp.y/n2_gp_mode*82)),
             #4. GP proj for D, 2 seasons > 41
                 gp.x > 0.4*n1_gp_mode & gp.y > 0.4*n2_gp_mode & pos == "D"~
-                round(76*.5+.25*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82) 
-                +.25*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y)*82)),
+                round(76*.5+.25*if_else((gp.x/n1_gp_mode*82) >= 82, 82,
+                gp.x/n1_gp_mode*82) 
+                +.25*if_else((gp.y/n2_gp_mode*82) >= 82, 82,gp.y/n2_gp_mode*82)),
             #5. GP proj for rookie non depth F, n1 season > 41
                 gp.x > 0.4*n1_gp_mode & gp.y == 0 & pos == "F" ~
-                round(74*.7+.3*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)),
+                round(74*.7+.3*if_else((gp.x/n1_gp_mode*82) >= 82, 82,
+                gp.x/n1_gp_mode*82)),
             #6. GP proj for rookie depth D,  n1 season > 41
                 gp.x > 0.4*n1_gp_mode & gp.y == 0 & pos == "D" ~
-                round(74*.7+.3*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)),
+                round(74*.7+.3*if_else((gp.x/n1_gp_mode*82) >= 82, 82,
+                gp.x/n1_gp_mode*82)),
             #7. GP proj for non depth F, n1 szn < 41, n2 szn > 41
                 gp.x <= 0.4*n1_gp_mode & gp.y > 0.4*n2_gp_mode & pos == "F" 
-                & proj_toi > 14.0 ~
-                round(74*.6+.15*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.25*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y)*82)),
+                & proj_toi > 13.25 ~
+                round(74*.6+.15*if_else((gp.x/n1_gp_mode*82) >= 82, 82,
+                gp.x/n1_gp_mode*82)
+                +.25*if_else((gp.y/n2_gp_mode*82) >= 82, 82,gp.y/n2_gp_mode*82)),
             #8. GP proj for non depth D, n1 szn < 41, n2 szn > 41
                 gp.x <= 0.4*n1_gp_mode & gp.y > 0.4*n2_gp_mode & pos == "D"
                 & proj_toi > 17.5 ~
-                round(74*.6+.15*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.25*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y)*82)),
+                round(74*.6+.15*if_else((gp.x/n1_gp_mode*82) >= 82, 82,
+                gp.x/n1_gp_mode*82)
+                +.25*if_else((gp.y/n2_gp_mode*82) >= 82, 82,gp.y/n2_gp_mode*82)),
             #9. GP proj for non depth F, n1 szn > 41, n2 szn < 41
                 gp.x > 0.4*n1_gp_mode & gp.y <= 0.4*n2_gp_mode & pos == "F"
-                & proj_toi > 14.0 ~
-                round(74*.6+.25*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.15*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y)*82)),
+                & proj_toi > 13.25 ~
+                round(74*.6+.25*if_else((gp.x/n1_gp_mode*82) >= 82, 82,
+                gp.x/n1_gp_mode*82)
+                +.15*if_else((gp.y/n2_gp_mode*82) >= 82, 82,gp.y/n2_gp_mode*82)),
             #10.GP proj for non depth D, n1 szn > 41, n2 szn < 41
                 gp.x > 0.4*n1_gp_mode & gp.y <= 0.4*n2_gp_mode & pos == "D"
                 & proj_toi > 17.5~
-                round(74*.6+.25*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.15*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y)*82)),
+                round(74*.6+.25*if_else((gp.x/n1_gp_mode*82) >= 82, 82,
+                gp.x/n1_gp_mode*82)
+                +.15*if_else((gp.y/n2_gp_mode*82) >= 82, 82,gp.y/n2_gp_mode*82)),
             #11.GP proj for non depth F, 2 seasons 
                 gp.x <= 0.4*n1_gp_mode & gp.y <= 0.4*n2_gp_mode & pos == "F" 
-                & proj_toi > 14.0 ~
-                round(74*.8+.10*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.10*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y)*82)),
+                & proj_toi > 13.25 ~
+                round(74*.8+.10*if_else((gp.x/n1_gp_mode*82) >= 82, 82,
+                gp.x/n1_gp_mode*82)
+                +.10*if_else((gp.y/n2_gp_mode*82) >= 82, 82,gp.y/n2_gp_mode*82)),
             #12.GP proj for non depth D, 2 seasons
                 gp.x <= 0.4*n1_gp_mode & gp.y <= 0.4*n2_gp_mode & pos == "D" 
                 & proj_toi > 17.5 ~
-                round(74*.8+.10*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.10*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y)*82)),
+                round(74*.8+.10*if_else((gp.x/n1_gp_mode*82) >= 82,
+                82,gp.x/n1_gp_mode*82)
+                +.10*if_else((gp.y/n2_gp_mode*82) >= 82, 82,gp.y/n2_gp_mode*82)),
             #13.GP proj for depth F, n1 szn < 41, n2 szn > 41
                 gp.x <= 0.4*n1_gp_mode & gp.y > 0.4*n2_gp_mode & pos == "F" 
-                & proj_toi <= 14.0 ~
-                round(40*.7+.125*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.175*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y)*82)),
+                & proj_toi <= 13.25 ~
+                round(40*.7+.125*if_else((gp.x/n1_gp_mode*82) >= 82, 82,
+                gp.x/n1_gp_mode*82)
+                +.175*if_else((gp.y/n2_gp_mode*82) >= 82, 82,gp.y/n2_gp_mode*82)),
             #14.GP proj for depth D, n1 szn < 41, n2 szn > 41
                 gp.x <= 0.4*n1_gp_mode & gp.y > 0.4*n2_gp_mode & pos == "D"
                 & proj_toi <= 17.5 ~
-                round(40*.7+.125*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.175*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y))*82),
+                round(40*.7+.125*if_else((gp.x/n1_gp_mode*82) >= 82, 82,
+                gp.x/n1_gp_mode*82)
+                +.175*if_else((gp.y/n2_gp_mode*82) >= 82, 82,gp.y/n2_gp_mode*82)),
             #15.GP proj for depth F, n1 szn > 41, n2 szn < 41
                 gp.x > 0.4*n1_gp_mode & gp.y <= 0.4*n2_gp_mode & pos == "F"
-                & proj_toi <= 14.0 ~
-                round(40*.7+.175*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.125**if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y)*82)),
+                & proj_toi <= 13.25 ~
+                round(40*.7+.175*if_else((gp.x/n1_gp_mode*82) >= 82, 82,
+                gp.x/n1_gp_mode*82)
+                +.125**if_else((gp.y/n2_gp_mode*82) >= 82, 82,gp.y/n2_gp_mode*82)),
             #16.GP proj for depth D, n1 szn > 41, n2 szn < 41
                 gp.x > 0.4*n1_gp_mode & gp.y <= 0.4*n2_gp_mode & pos == "D"
                 & proj_toi <= 17.5~
-                round(40*.7+.175*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.125*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y))*82),
-            #17.GP proj for depth F, n1 szn < 41, n2 szn > 41
-                gp.x <= 0.4*n1_gp_mode & gp.y > 0.4*n2_gp_mode & pos =="F" 
-                & proj_toi <= 14.0 ~
-                round(40*.7+.125*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.175*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y)*82)),
-            #18.GP proj for depth D, n1 szn < 41, n2 szn > 41
-                gp.x <= 0.4*n1_gp_mode & gp.y > 0.4*n2_gp_mode & pos =="D"
-                & proj_toi <= 17.5 ~
-                round(40*.7+.125*if_else((gp.x/max(gp.x)*82) >= 82, 82,gp.x/max(gp.x)*82)
-                +.175*if_else((gp.y/max(gp.y)*82) >= 82, 82,gp.y/max(gp.y)*82))
-           ),
+                round(40*.7+.175*if_else((gp.x/n1_gp_mode*82) >= 82, 82,
+                gp.x/n1_gp_mode*82)
+                +.125*if_else((gp.y/n2_gp_mode*82) >= 82, 82,gp.y/n2_gp_mode*82))
+               ),
                   proj_toi = round(proj_toi,2),
+           # add  3 of seasons together to create single weighted value for each stat
                   sum_g = g.x+g.y+g,
                   sum_a = a.x+a.y+a,
                   sum_p = p.x+p.y+p,
@@ -452,9 +449,10 @@ f = 1250
 d = 1750 
 
 # to calc the non-age adjusted projections we have the following formula. If we were projecting goals it would be:
-# [(summed g + lg avg g)/(sum toi + (1250 or 1750)]*GP*toi
-# regressed goals is how many goals a lg average player would've scored in that players TOI
-# This number is then multiplied by GP and toi
+# [(summed g + avg g)/(sum toi + (1250 or 1750)]*GP*toi
+# Where avg g is the # of goals an average player would score in the regressed toi 
+# Eg: for a F calc'd as: (lg avg g/lg avg toi)*(1250)
+
 
 proj_plyr <- sum_plyr %>% transmute(
                 player = player,
@@ -517,6 +515,6 @@ final_proj
 }
 ```
 
-# select which season you wish to project. Type in the year you would like. Eg: For the 2022-2023 season you would use 2023.
+# select which season you wish to project, you can project any year back to 2011. Just Type in the year you would like. Eg: For the 2022-2023 season you would use 2023.
 
 projected_season <- proj_season(2023)
